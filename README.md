@@ -44,6 +44,35 @@ Setup:
 Run tests:
 php artisan test
 
+### Using Sail (Docker)
+
+This project includes Laravel Sail (Docker) for local development.
+
+- Start the containers (detached):
+  ./vendor/bin/sail up -d
+- Stop and remove containers:
+  ./vendor/bin/sail down
+- Rebuild images:
+  ./vendor/bin/sail build --no-cache
+- Run Artisan or Composer inside the app container:
+  ./vendor/bin/sail artisan migrate
+  ./vendor/bin/sail composer install
+- Run tests:
+  ./vendor/bin/sail test
+- Open a shell in the app container:
+  ./vendor/bin/sail shell
+
+Ports and environment
+- The frontend is available at http://localhost:${APP_PORT:-8000} (APP_PORT in .env).
+- To avoid host port collisions the compose file reads:
+  - FORWARD_DB_PORT (default 3307) → maps to container 3306
+  - FORWARD_REDIS_PORT (default 6381) → maps to container 6379
+  Edit these in .env if the defaults conflict with other services on your machine.
+
+Useful tip
+- If you prefer a shorter command you can create an alias:
+  alias sail='./vendor/bin/sail'
+
 ## Contributing
 Contributions are welcome. Please open issues for features/bugs and submit PRs for changes. Keep changes small and include tests where applicable.
 
