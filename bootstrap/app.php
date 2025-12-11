@@ -30,86 +30,72 @@ return Application::configure(basePath: dirname(__DIR__))
             ApiException::class,
         ]);
 
-        // Validation
-        $exceptions->renderable(function (ValidationException $e, $request) {
-            $rid = $request->headers->get('X-Request-Id') ?? $request->attributes->get('request_id');
+        $errorResponseTemplate = function (
+            string $textCode,
+            string $message,
+            mixed $details,
+            int $requestId,
+            int $status = 500
+        ) {
             return response()->json([
                 'error' => [
-                    'code' => 'VALIDATION_ERROR',
-                    'message' => 'The given data was invalid.',
-                    'details' => $e->errors(),
+                    'code' => $textCode,
+                    'message' => $message,
+                    'details' => $details,
                 ],
-                'meta' => ['request_id' => $rid],
-            ], 422);
+                'meta' => ['request_id' => $requestId],
+            ], $status);
+        };
+        // Validation
+        $exceptions->renderable(function (ValidationException $e, $request) use ($errorResponseTemplate) {
+            $rid = $request->headers->get('X-Request-Id') ?? $request->attributes->get('request_id');
+            $details = method_exists($e, 'errors') ? $e->errors() : null;
+            $message = $e->getMessage() ?: 'The given data was invalid.';
+            return $errorResponseTemplate('VALIDATION_ERROR', $message, $details, $rid, 422);
         });
 
         // Authentication / Authorization
-        $exceptions->renderable(function (AuthenticationException $e, $request) {
+        $exceptions->renderable(function (AuthenticationException $e, $request) use ($errorResponseTemplate) {
             $rid = $request->headers->get('X-Request-Id') ?? $request->attributes->get('request_id');
-            return response()->json([
-                'error' => ['code' => 'UNAUTHENTICATED', 'message' => 'Unauthenticated.'],
-                'meta' => ['request_id' => $rid],
-            ], 401);
+            return $errorResponseTemplate('UNAUTHENTICATED', 'Unauthenticated.', $e->getMessage() ?: null, $rid, 401);
         });
 
-        $exceptions->renderable(function (AuthorizationException $e, $request) {
+        $exceptions->renderable(function (AuthorizationException $e, $request) use ($errorResponseTemplate) {
             $rid = $request->headers->get('X-Request-Id') ?? $request->attributes->get('request_id');
-            return response()->json([
-                'error' => ['code' => 'FORBIDDEN', 'message' => 'This action is unauthorized.'],
-                'meta' => ['request_id' => $rid],
-            ], 403);
+            return $errorResponseTemplate('FORBIDDEN', 'This action is unauthorized.', $e->getMessage() ?: null, $rid, 403);
         });
 
         // Not found (routes or models)
-        $exceptions->renderable(function (NotFoundHttpException|ModelNotFoundException $e, $request) {
+        $exceptions->renderable(function (NotFoundHttpException|ModelNotFoundException $e, $request) use ($errorResponseTemplate) {
             $rid = $request->headers->get('X-Request-Id') ?? $request->attributes->get('request_id');
-            return response()->json([
-                'error' => ['code' => 'NOT_FOUND', 'message' => 'Resource not found.'],
-                'meta' => ['request_id' => $rid],
-            ], 404);
+            return $errorResponseTemplate('NOT_FOUND', 'Resource not found.', $e->getMessage() ?: null, $rid, 404);
         });
 
         // Throttling
-        $exceptions->renderable(function (ThrottleRequestsException $e, $request) {
+        $exceptions->renderable(function (ThrottleRequestsException $e, $request) use ($errorResponseTemplate) {
             $rid = $request->headers->get('X-Request-Id') ?? $request->attributes->get('request_id');
-            return response()->json([
-                'error' => ['code' => 'TOO_MANY_REQUESTS', 'message' => 'Too many requests.'],
-                'meta' => ['request_id' => $rid],
-            ], 429);
+            return $errorResponseTemplate('TOO_MANY_REQUESTS', 'Too many requests.', $e->getMessage() ?: null, $rid, 429);
         });
 
         // Domain/API exceptions thrown intentionally
-        $exceptions->renderable(function (ApiException $e, $request) {
+        $exceptions->renderable(function (ApiException $e, $request) use ($errorResponseTemplate) {
             $rid = $request->headers->get('X-Request-Id') ?? $request->attributes->get('request_id');
-            return response()->json([
-                'error' => array_filter([
-                    'code' => $e->codeStr,
-                    'message' => $e->getMessage(),
-                    'details' => $e->details ?: null,
-                ]),
-                'meta' => ['request_id' => $rid],
-            ], $e->status);
+            return $errorResponseTemplate($e->codeStr, $e->getMessage(), $e->details ?: null, $rid, $e->status);
         });
 
         // Generic HTTP exceptions
-        $exceptions->renderable(function (HttpExceptionInterface $e, $request) {
+        $exceptions->renderable(function (HttpExceptionInterface $e, $request) use ($errorResponseTemplate) {
             $rid = $request->headers->get('X-Request-Id') ?? $request->attributes->get('request_id');
             $status = $e->getStatusCode();
-            return response()->json([
-                'error' => ['code' => 'HTTP_EXCEPTION', 'message' => $e->getMessage() ?: 'HTTP error.'],
-                'meta' => ['request_id' => $rid],
-            ], $status);
+            return $errorResponseTemplate('HTTP_EXCEPTION', $e->getMessage() ?: 'HTTP error.', $e->getMessage() ?: null, $rid, $status);
         });
 
         // Last-resort fallback for API requests
-        $exceptions->renderable(function (\Throwable $e, $request) {
+        $exceptions->renderable(function (\Throwable $e, $request) use ($errorResponseTemplate) {
             if (!($request->expectsJson() || $request->is('api/*'))) {
                 return null; // let default HTML rendering handle it
             }
             $rid = $request->headers->get('X-Request-Id') ?? $request->attributes->get('request_id');
-            return response()->json([
-                'error' => ['code' => 'INTERNAL_SERVER_ERROR', 'message' => 'Something went wrong.'],
-                'meta' => ['request_id' => $rid],
-            ], 500);
+            return $errorResponseTemplate('INTERNAL_SERVER_ERROR', 'Something went wrong.', $e->getMessage() ?: null, $rid, 500);
         });
     })->create();
