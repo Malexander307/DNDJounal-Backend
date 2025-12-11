@@ -48,7 +48,7 @@ trait ApiResponse
     protected function requestMeta(): array
     {
         $rid = request()->headers->get('X-Request-Id') ?? request()->attributes->get('request_id');
-        return array_filter(['request_id' => $rid]);
+        return ['request_id' => $rid];
     }
 }
 
