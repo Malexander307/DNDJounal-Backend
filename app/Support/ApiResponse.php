@@ -24,11 +24,11 @@ trait ApiResponse
     protected function error(string $message, int $status = 400, ?string $code = null, array $details = []): JsonResponse
     {
         return response()->json([
-            'error' => array_filter([
+            'error' => [
                 'code' => $code,
                 'message' => $message,
                 'details' => $details ?: null,
-            ]),
+            ],
             'meta' => $this->requestMeta(),
         ], $status);
     }
